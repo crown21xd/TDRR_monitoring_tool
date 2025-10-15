@@ -16,8 +16,8 @@ jammer_power_dB = 30;                        % par.rho_dB: jammer strength relat
 modulation_scheme = 'QPSK';                  % par.mod: transmit constellation (modulation scheme: QPSK for 2 bits/symbol)
 random_jammer_power_flag = 0;                % par.random_jammer_power: if true, jammer power varies randomly per trial; else fixed at par.rho_dB
     
-num_trials = 1;                            % par.trials: number of Monte-Carlo trials (different channel realizations for statistical averaging)
-snr_dB_list = -5:1:20;                       % par.SNRdB_list: list of SNR values (in dB) to simulate (signal-to-noise ratio sweep)
+num_trials = 2;                            % par.trials: number of Monte-Carlo trials (different channel realizations for statistical averaging)
+snr_dB_list = -5:1:25;                       % par.SNRdB_list: list of SNR values (in dB) to simulate (signal-to-noise ratio sweep)
 
 plot_flag = 1;                              % par.plot: flag to enable/disable plotting of simulation results
 print_messages_flag = 1;                     % par.printmsg: flag to enable/disable printing of progress messages during simulation
@@ -84,9 +84,11 @@ y_compliant_frequency = zeros(num_receive_antennas,num_subcarriers,num_ofdm_symb
 y_noncompliant_frequency = zeros(num_receive_antennas,num_subcarriers,num_ofdm_symbols); % y_noncomp_f
 
 
+% Initialize accumulators for averaging for received signal
+avg_y_jammerless = zeros(num_receive_antennas, num_used_subcarriers, num_ofdm_symbols);
+avg_y_jammer_compliant = zeros(num_receive_antennas, num_used_subcarriers, num_ofdm_symbols);
+avg_y_jammer_noncompliant = zeros(num_receive_antennas, num_used_subcarriers, num_ofdm_symbols);
 
-
-%% 
 
 % results
 jammer_compliant_freq_domain = zeros(num_trials, num_used_subcarriers,num_receive_antennas, num_ofdm_symbols); % Y_oj_comp
@@ -118,6 +120,8 @@ indices = zeros(num_trials, num_ofdm_symbols, num_transmit_antennas,num_used_sub
 % Corresponds to Section III (Jammer Modeling and Interference Analysis): Monte-Carlo simulation loop for channel realizations and jammer signal generation.
 tic
 for trial_index=1:num_trials
+
+  
 
   % generate jammer's channel in the time domain
   % Corresponds to Section II (System Model): Rayleigh fading channel generation.
@@ -231,8 +235,8 @@ for trial_index=1:num_trials
       y_compliant_frequency_tones = y_compliant_frequency(:,used_subcarrier_indices,:);
       y_noncompliant_frequency_tones = y_noncompliant_frequency(:,used_subcarrier_indices,:);
 
+
       user_channel_frequency_tones = user_channel_freq(:,:,used_subcarrier_indices);  % channel frequency response for used subcarriers
-    
     
       %%% collect jammer statistics for later analysis
       for tone_index=1:num_used_subcarriers
@@ -281,8 +285,8 @@ for trial_index=1:num_trials
       for b=1:num_channel_taps
         symbols_estimate_projections(b,:,:) = (sqrt(num_subcarriers)*(squeeze(projectors(b,:,:))*squeeze(user_channel_frequency_tones(:,:,tone_index))))\(squeeze(projectors(b,:,:))*squeeze(y_noncompliant_frequency_tones(:,tone_index,:)));  % zero-forcing with multiple nulling projectors
       end
-
-      % -- compute bit outputs by minimum distance decoding
+        
+           % -- compute bit outputs by minimum distance decoding
       % Corresponds to Section IV (Mitigation): Decoding.
       symbols_estimate_jammerless_vector = reshape(symbols_estimate_jammerless, [num_ofdm_symbols*num_transmit_antennas,1]);  % vectorize estimated symbols
       [~,indices_hat_vector] = min(abs(symbols_estimate_jammerless_vector*ones(1,length(constellation_symbols))-ones(num_ofdm_symbols*num_transmit_antennas,1)*constellation_symbols).^2,[],2);  % find closest constellation points
@@ -306,85 +310,31 @@ for trial_index=1:num_trials
         indices_hat = reshape(indices_hat_vector, [num_transmit_antennas, num_ofdm_symbols]);
         bits_hat_projections(b,:,:) = bit_mappings(indices_hat,:);
       end
-              
-        
-        % gian marti BER
-        % -- compute error metrics by comparing estimated bits to true bits
-        % Corresponds to Section IV (Mitigation): BER calculation.
-        
-        % % Extract bits for current trial and subcarrier
-        % bit_tensor = squeeze(bits(trial_index, :, :, :, tone_index));  % size: [num_ofdm_symbols, num_transmit_antennas, bits_per_symbol]
-        % 
-        % % Reshape true bits to 2D matrix: [num_ofdm_symbols * num_transmit_antennas, bits_per_symbol]
-        % true_bits = reshape(bit_tensor, [], bits_per_symbol);
-        % 
-        % % Reshape estimated bits to match true_bits dimensions
-        % 
-        % % jammerless
-        % bits_hat_jammerless_reshaped = reshape(bits_hat_jammerless.', [], bits_per_symbol);
-        % 
-        % % compliant
-        % bits_hat_compliant_reshaped = reshape(bits_hat_compliant.', [], bits_per_symbol);
-        % 
-        % % noncompliant
-        % bits_hat_noncompliant_reshaped = reshape(bits_hat_noncompliant.', [], bits_per_symbol);
-        % 
+      
 
-        % --- Compute BER for SISO QPSK ---
-        % Extract true bits for current trial and subcarrier
-        bit_tensor = squeeze(bits(trial_index, :, :, :, tone_index));   % [num_ofdm_symbols, 1, bits_per_symbol]
-        true_bits  = reshape(bit_tensor, [], bits_per_symbol);
+      %gian marti BER
+      % -- compute error metrics by comparing estimated bits to true bits
+      % Corresponds to Section IV (Mitigation): BER calculation.
+      bit_tensor = squeeze(bits(trial_index,:,:,:,tone_index));  % extract bits for current trial and subcarrier
+      bit_tensor = permute(bit_tensor,[3 2 1]);  % reorder dimensions for comparison
+      true_bits = bit_tensor(:,:)';  % flatten to 2D matrix
+      bits_hat_jammerless = permute(bits_hat_jammerless, [3 2 1]);
+        bits_hat_jammerless = bits_hat_jammerless(:,:)';
         
-        % --- Jammerless case ---
-        s_hat_jammerless = squeeze(y_jammerless_frequency_tones(:,tone_index,:)) ./ ...
-                           squeeze(user_channel_frequency_tones(:,:,tone_index));
+        bits_hat_compliant = permute(bits_hat_compliant, [3 2 1]);
+        bits_hat_compliant = bits_hat_compliant(:,:)';
         
-        % Demodulate symbols back to bits (QPSK)
-        symbols_detected_jammerless = qamdemod(s_hat_jammerless, 4, 'UnitAveragePower', true);
-        bits_hat_jammerless = de2bi(symbols_detected_jammerless, bits_per_symbol, 'left-msb');
-        
-        % Ensure same shape as true_bits
-        bits_hat_jammerless_reshaped = reshape(bits_hat_jammerless, [], bits_per_symbol);
-        
-        % Count errors
-        results.BER_jammerless(snr_index) = results.BER_jammerless(snr_index) + ...
-                                            sum(sum(true_bits ~= bits_hat_jammerless));
-        
-        % --- Compliant jammer case ---
-        s_hat_compliant = squeeze(y_compliant_frequency_tones(:,tone_index,:)) ./ ...
-                          squeeze(user_channel_frequency_tones(:,:,tone_index));
-        
-        symbols_detected_compliant = qamdemod(s_hat_compliant, 4, 'UnitAveragePower', true);
-        bits_hat_compliant = de2bi(symbols_detected_compliant, bits_per_symbol, 'left-msb');
-        bits_hat_compliant_reshaped = reshape(bits_hat_compliant, [], bits_per_symbol);
-        
-        results.BER_compliant(snr_index) = results.BER_compliant(snr_index) + ...
-                                           sum(sum(true_bits ~= bits_hat_compliant));
-        
-        % --- Noncompliant jammer case ---
-        s_hat_noncompliant = squeeze(y_noncompliant_frequency_tones(:,tone_index,:)) ./ ...
-                             squeeze(user_channel_frequency_tones(:,:,tone_index));
-        
-        symbols_detected_noncompliant = qamdemod(s_hat_noncompliant, 4, 'UnitAveragePower', true);
-        bits_hat_noncompliant = de2bi(symbols_detected_noncompliant, bits_per_symbol, 'left-msb');
-        bits_hat_noncompliant_reshaped = reshape(bits_hat_noncompliant, [], bits_per_symbol);
-        
-        results.BER_noncompliant(snr_index) = results.BER_noncompliant(snr_index) + ...
-                                              sum(sum(true_bits ~= bits_hat_noncompliant));
+        bits_hat_noncompliant = permute(bits_hat_noncompliant, [3 2 1]);
+        bits_hat_noncompliant = bits_hat_noncompliant(:,:)';
 
-        
-        % Update BER counts by summing bit errors
-        results.BER_jammerless(snr_index) = results.BER_jammerless(snr_index) + sum(sum(true_bits ~= bits_hat_jammerless_reshaped));
-        results.BER_compliant(snr_index) = results.BER_compliant(snr_index) + sum(sum(true_bits ~= bits_hat_compliant_reshaped));
-        results.BER_noncompliant(snr_index) = results.BER_noncompliant(snr_index) + sum(sum(true_bits ~= bits_hat_noncompliant_reshaped));
-        
-        % For projections, loop over channel taps
-        for b = 1:num_channel_taps
-            bits_hat_proj = squeeze(bits_hat_projections(b, :, :)); % size: [num_transmit_antennas * num_ofdm_symbols, bits_per_symbol]
-            % Reshape bits_hat_proj to [num_ofdm_symbols * num_transmit_antennas, bits_per_symbol]
-            bits_hat_proj_reshaped = reshape(permute(bits_hat_proj, [2 1]), [], bits_per_symbol);
-            results.BER_projections(b, snr_index) = results.BER_projections(b, snr_index) + sum(sum(true_bits ~= bits_hat_proj_reshaped));
-        end
+      results.BER_jammerless(snr_index) = results.BER_jammerless(snr_index) + sum(sum(true_bits~=bits_hat_jammerless));  % count bit errors jammerless
+      results.BER_compliant(snr_index) = results.BER_compliant(snr_index) + sum(sum(true_bits~=bits_hat_compliant));  % count bit errors jammer compliant
+      results.BER_noncompliant(snr_index) = results.BER_noncompliant(snr_index) + sum(sum(true_bits~=bits_hat_noncompliant));  % count bit errors jammer noncompliant
+      for b=1:num_channel_taps
+          bits_hat_proj = permute(squeeze(bits_hat_projections(b,:,:,:)), [3 2 1]);
+          bits_hat_projections = bits_hat_proj(:,:)';
+        results.BER_projections(b,snr_index) = results.BER_projections(b,snr_index) + sum(sum(true_bits~=squeeze(bits_hat_projections(b,:,:))));  % count bit errors for each nulling dimension
+      end
 
     end
 %% 
@@ -414,35 +364,21 @@ for trial_index=1:num_trials
             subplot(5,1,1)
             plot(used_subcarrier_indices, real(squeeze(y_jammerless_frequency_tones(antenna_idx,:,ofdm_symbol_idx))))
             ylim([-100 100])
-            title('Jammerless Frequency Tones ')
+            title('Legitimate TVWS ')
             xlabel('Subcarrier Index')
             ylabel('Magnitude')
 
             subplot(5,1,2)
             plot(used_subcarrier_indices, real(squeeze(y_jammer_compliant_frequency_tones(antenna_idx,:,ofdm_symbol_idx))))
             ylim([-100 100])
-            title('Jammer Compliant Frequency Tones ')
+            title('OFDM-compliant Illegitimate TVWS Frequency Tones ')
             xlabel('Subcarrier Index')
             ylabel('Magnitude')
 
             subplot(5,1,3)
             plot(used_subcarrier_indices, real(squeeze(y_jammer_noncompliant_frequency_tones(antenna_idx,:,ofdm_symbol_idx))))
             ylim([-100 100])
-            title('Jammer Noncompliant Frequency Tones ')
-            xlabel('Subcarrier Index')
-            ylabel('Magnitude')
-
-            subplot(5,1,4)
-            plot(used_subcarrier_indices, real(squeeze(y_compliant_frequency_tones(antenna_idx,:,ofdm_symbol_idx))))
-            ylim([-100 100])
-            title('Full Compliant Frequency Tones ')
-            xlabel('Subcarrier Index')
-            ylabel('Magnitude')
-
-            subplot(5,1,5)
-            plot(used_subcarrier_indices, real(squeeze(y_noncompliant_frequency_tones(antenna_idx,:,ofdm_symbol_idx))))
-            ylim([-100 100])
-            title('Full Noncompliant Frequency Tones ')
+            title('Cyclic prefix-violating Illegitimate TVWS Frequency Tones ')
             xlabel('Subcarrier Index')
             ylabel('Magnitude')
 
@@ -452,6 +388,11 @@ for trial_index=1:num_trials
          end
 
       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  % Accumulate signals across trials
+    avg_y_jammerless = avg_y_jammerless + y_jammerless_frequency_tones;
+    avg_y_jammer_compliant = avg_y_jammer_compliant + y_jammer_compliant_frequency_tones;
+    avg_y_jammer_noncompliant = avg_y_jammer_noncompliant + y_jammer_noncompliant_frequency_tones;
 
 end % iterate over MC trials
 
@@ -467,6 +408,9 @@ results.spatial_interference_distribution = results.spatial_interference_distrib
 results.spatial_interference_distribution_sc_std = std(results.spatial_interference_distribution.');
 results.spatial_interference_distribution_sc_avg = mean(results.spatial_interference_distribution.');
 
+avg_y_jammerless = avg_y_jammerless / num_trials;
+avg_y_jammer_compliant = avg_y_jammer_compliant / num_trials;
+avg_y_jammer_noncompliant = avg_y_jammer_noncompliant / num_trials;
 
 
 %%% plot results
@@ -475,19 +419,42 @@ if plot_flag
 
   figure(1)
   semilogy(snr_dB_list, results.BER_jammerless, 'LineWidth', 2.5)
+  hold off
+  grid on
+  axis([min(snr_dB_list) max(snr_dB_list) 1e-4 1])
+  xlabel('average SNR per receive antenna [dB]','FontSize',12)
+  ylabel('uncoded bit error-rate (BER)','FontSize',12)
+  legend("Legitimate TVWS",'FontSize',12,'Interpreter','none')
+  set(gca,'FontSize',12)
+  set(gcf,'position',[10,10,400,300])
+
+  figure(2)
+  semilogy(snr_dB_list, results.BER_jammerless, 'LineWidth', 2.5)
   hold on
   semilogy(snr_dB_list, results.BER_compliant, 'LineWidth', 2.5)
+  hold off
+  grid on
+  axis([min(snr_dB_list) max(snr_dB_list) 1e-4 1])
+  xlabel('average SNR per receive antenna [dB]','FontSize',12)
+  ylabel('uncoded bit error-rate (BER)','FontSize',12)
+  legend(["Legitimate TVWS", "OFDM-compliant Illegitimate TVWS"],'FontSize',12,'Interpreter','none')
+  set(gca,'FontSize',12)
+  set(gcf,'position',[10,10,400,300])
+
+  figure(3)
+  semilogy(snr_dB_list, results.BER_jammerless, 'LineWidth', 2.5)
+  hold on
   semilogy(snr_dB_list, results.BER_noncompliant, 'LineWidth', 2.5)
   hold off
   grid on
   axis([min(snr_dB_list) max(snr_dB_list) 1e-4 1])
   xlabel('average SNR per receive antenna [dB]','FontSize',12)
   ylabel('uncoded bit error-rate (BER)','FontSize',12)
-  legend(["Jammerless", "OFDM-compliant jammer", "Cyclic prefix-violating jammer"],'FontSize',12,'Interpreter','none')
+  legend(["Legitimate TVWS", "Cyclic prefix-violating Illegitimate TVWS"],'FontSize',12,'Interpreter','none')
   set(gca,'FontSize',12)
   set(gcf,'position',[10,10,400,300])
 
-  figure(2)
+  figure(4)
   bar(1:num_receive_antennas,results.spatial_interference_distribution_sc_avg)
   hold on
   er = errorbar(1:num_receive_antennas,results.spatial_interference_distribution_sc_avg, ...
@@ -502,7 +469,7 @@ if plot_flag
   ylabel('fraction of receive interference')
   set(gcf,'position',[10,10,400,300])
 
-  figure(3)
+  figure(5)
   semilogy(snr_dB_list, results.BER_projections(1,:), 'LineWidth', 2.5)
   hold on
   for b=2:num_channel_taps
@@ -522,7 +489,7 @@ if plot_flag
   set(gcf,'position',[10,10,400,300])
 
   % Plot jammer statistics
-  figure(4)
+  figure(6)
   % Average magnitude over trials and OFDM symbols for compliant jammer
   jammer_compliant_avg = mean(mean(abs(jammer_compliant_freq_domain),4),1); % Average over trials and OFDM symbols
   subplot(2,1,1)
@@ -542,4 +509,45 @@ if plot_flag
   colorbar
   set(gcf,'position',[10,10,600,400])
 
+ % After all trials are done
+figure(11)
+clf
+antenna_idx = 1;
+ofdm_symbol_idx = num_ofdm_symbols; % last OFDM symbol
+
+% Extract the real magnitudes
+legit_signal = real(squeeze(avg_y_jammerless(antenna_idx,:,ofdm_symbol_idx)));
+compliant_signal = real(squeeze(avg_y_jammer_compliant(antenna_idx,:,ofdm_symbol_idx)));
+noncompliant_signal = real(squeeze(avg_y_jammer_noncompliant(antenna_idx,:,ofdm_symbol_idx)));
+
+% Compute shared Y limits (flexible, based on max magnitude across all)
+max_val = max([abs(legit_signal(:)); abs(compliant_signal(:)); abs(noncompliant_signal(:))]);
+yl = [-100 100];
+
+% Plot 1 – Legitimate TVWS
+figure;
+plot(used_subcarrier_indices, legit_signal, 'b', 'LineWidth', 1.3);
+ylim(yl);
+grid on;
+title(['Average Legitimate TVWS (', num2str(num_trials), ' Trials)']);
+xlabel('Subcarrier Index');
+ylabel('Magnitude');
+
+% Plot 2 – OFDM-compliant Illegitimate TVWS
+figure;
+plot(used_subcarrier_indices, compliant_signal, 'r', 'LineWidth', 1.3);
+ylim(yl);
+grid on;
+title(['Average OFDM-compliant Illegitimate TVWS (', num2str(num_trials), ' Trials)']);
+xlabel('Subcarrier Index');
+ylabel('Magnitude');
+
+% Plot 3 – CP-violating Illegitimate TVWS
+figure;
+plot(used_subcarrier_indices, noncompliant_signal, 'm', 'LineWidth', 1.3);
+ylim(yl);
+grid on;
+title(['Average CP-violating Illegitimate TVWS (', num2str(num_trials), ' Trials)']);
+xlabel('Subcarrier Index');
+ylabel('Magnitude');
 end
