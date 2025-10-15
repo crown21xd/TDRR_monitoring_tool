@@ -439,10 +439,10 @@ if plot_flag
   set(gcf,'position',[10,10,400,300])
 
   % Plot jammer statistics
-  figure(5)
+  figure(7)
   % Average magnitude over trials and OFDM symbols for compliant jammer
   jammer_compliant_avg = mean(mean(abs(jammer_compliant_freq_domain),4),1); % Average over trials and OFDM symbols
-  subplot(2,1,1)
+  subplot(7,1,1)
   imagesc(squeeze(jammer_compliant_avg))
   title('Jammer Compliant Frequency Domain Magnitude (Avg over Trials and OFDM Symbols)')
   xlabel('Receive Antenna')
@@ -451,7 +451,7 @@ if plot_flag
 
   % Average magnitude over trials and OFDM symbols for noncompliant jammer
   jammer_noncompliant_avg = mean(mean(abs(jammer_noncompliant_freq_domain),4),1); % Average over trials and OFDM symbols
-  subplot(2,1,2)
+  subplot(7,1,2)
   imagesc(squeeze(jammer_noncompliant_avg))
   title('Jammer Noncompliant Frequency Domain Magnitude (Avg over Trials and OFDM Symbols)')
   xlabel('Receive Antenna')
