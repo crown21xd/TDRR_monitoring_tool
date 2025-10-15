@@ -11,9 +11,9 @@ num_subcarriers = 64;                        % par.N_sc: number of total subcarr
 used_subcarrier_indices = [-26:-22, -20:-8, -6:-1, 1:6, 8:20, 22:26] + 32; % par.tonelist: list of used subcarriers (data-bearing tones), shifted by 32 for DC centering
 num_used_subcarriers = length(used_subcarrier_indices); % par.num_tones: total number of active subcarriers
 num_ofdm_symbols = 50;                       % par.num_ofdm_symbols: number of OFDM symbols sent per channel realization (temporal diversity)
-jammer_power_dB = 30;                        % par.rho_dB: jammer strength relative to signal strength (in dB) - high value simulates strong jamming
+jammer_power_dB = 25;                        % par.rho_dB: jammer strength relative to signal strength (in dB) - high value simulates strong jamming
 modulation_scheme = 'BPSK';                  % par.mod: transmit constellation (modulation scheme: QPSK for 2 bits/symbol)
-random_jammer_power_flag = 0;                % par.random_jammer_power: if true, jammer power varies randomly per trial; else fixed at par.rho_dB
+random_jammer_power_flag = 1;                % par.random_jammer_power: if true, jammer power varies randomly per trial; else fixed at par.rho_dB
     
 num_trials = 100;                            % par.trials: number of Monte-Carlo trials (different channel realizations for statistical averaging)
 snr_dB_list = -5:1:20;                       % par.SNRdB_list: list of SNR values (in dB) to simulate (signal-to-noise ratio sweep)
@@ -196,7 +196,7 @@ for trial_index=1:num_trials
       receive_signal_noncompliant = receive_signal_legitimate_TVWSO + receive_signal_jammer_noncompliant;  % total received signal with noncompliant jammer
         
       
-
+      
 
       %%% generate noise in the time domain
       noise_time = sqrt(0.5)*randn(num_receive_antennas,num_subcarriers)+ 1j*sqrt(0.5)*randn(num_receive_antennas,num_subcarriers);  % N
@@ -228,7 +228,12 @@ for trial_index=1:num_trials
       y_jammer_noncompliant_frequency_tones = y_jammer_noncompliant_frequency(:,used_subcarrier_indices,:);
       y_compliant_frequency_tones = y_compliant_frequency(:,used_subcarrier_indices,:);
       y_noncompliant_frequency_tones = y_noncompliant_frequency(:,used_subcarrier_indices,:);
-
+      
+      if trial_index == 1 && snr_index == length(snr_dB_list) && ofdm_symbol_index == 1
+          plot_signal_jammerless = y_jammerless_frequency_tones;
+          plot_signal_compliant = y_jammer_compliant_frequency_tones;
+          plot_signal_noncompliant = y_jammer_noncompliant_frequency_tones;
+      end
       user_channel_frequency_tones = user_channel_freq(:,:,used_subcarrier_indices);  % channel frequency response for used subcarriers
     
     
@@ -260,11 +265,12 @@ for trial_index=1:num_trials
       jammer_estimate_noncompliant = U_noncompliant(:,1);  % dominant jammer subspace vector noncompliant
       projection_matrix_noncompliant = eye(num_receive_antennas) - jammer_estimate_noncompliant*jammer_estimate_noncompliant';  % projection matrix to null jammer noncompliant
 
-      % projectors = zeros(num_channel_taps,num_receive_antennas,num_receive_antennas);  % initialize multiple projectors for different nulling dimensions
-      % for b=1:num_channel_taps
+      projectors = zeros(num_channel_taps,num_receive_antennas,num_receive_antennas);  % initialize multiple projectors for different nulling dimensions
+       for b=1:num_channel_taps
       %   projectors(b,:,:) = eye(num_receive_antennas) - U_noncompliant(:,1:b)*U_noncompliant(:,1:b)';  % projector nulling b jammer subspace vectors
-      % end
-      projectors = repmat(eye(num_receive_antennas), [num_channel_taps, 1, 1]); %no-op projection in SISO
+          projectors = repmat(eye(num_receive_antennas), [num_channel_taps, 1, 1]); %no-op projection in SISO
+       end
+      
   
       %%% detect signals using zero-forcing (and, in some cases, jammer mitigation)
       % Corresponds to Section IV (Mitigation): Zero-forcing detection with/without nulling.
@@ -332,54 +338,6 @@ for trial_index=1:num_trials
     end
   end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-         % % save signal for plotting (after removing unused subcarriers)
-         if trial_index == 1 && snr_index == length(snr_dB_list) && ofdm_symbol_index == 1
-
-            % Plot frequency domain used subcarriers signals (magnitude) for antenna 2 and last OFDM symbol
-            figure(11)
-            clf
-            antenna_idx = 1;
-            ofdm_symbol_idx = num_ofdm_symbols; % last OFDM symbol
-
-            subplot(5,1,1)
-            plot(used_subcarrier_indices, real(squeeze(y_jammerless_frequency_tones(antenna_idx,:,ofdm_symbol_idx))))
-            ylim([-100 100])
-            title('Jammerless Frequency Tones ')
-            xlabel('Subcarrier Index')
-            ylabel('Magnitude')
-
-            subplot(5,1,2)
-            plot(used_subcarrier_indices, real(squeeze(y_jammer_compliant_frequency_tones(antenna_idx,:,ofdm_symbol_idx))))
-            ylim([-100 100])
-            title('Jammer Compliant Frequency Tones ')
-            xlabel('Subcarrier Index')
-            ylabel('Magnitude')
-
-            subplot(5,1,3)
-            plot(used_subcarrier_indices, real(squeeze(y_jammer_noncompliant_frequency_tones(antenna_idx,:,ofdm_symbol_idx))))
-            ylim([-100 100])
-            title('Jammer Noncompliant Frequency Tones ')
-            xlabel('Subcarrier Index')
-            ylabel('Magnitude')
-
-            subplot(5,1,4)
-            plot(used_subcarrier_indices, real(squeeze(y_compliant_frequency_tones(antenna_idx,:,ofdm_symbol_idx))))
-            ylim([-100 100])
-            title('Full Compliant Frequency Tones ')
-            xlabel('Subcarrier Index')
-            ylabel('Magnitude')
-
-            subplot(5,1,5)
-            plot(used_subcarrier_indices, real(squeeze(y_noncompliant_frequency_tones(antenna_idx,:,ofdm_symbol_idx))))
-            ylim([-100 100])
-            title('Full Noncompliant Frequency Tones ')
-            xlabel('Subcarrier Index')
-            ylabel('Magnitude')
-
-            sgtitle(['Received Signals at Used Subcarriers ( OFDM Symbol ', num2str(ofdm_symbol_idx), ') at Trial ', num2str(trial_index)]) % Add a super title with trial number
-            drawnow % Force update of the figure for live view
-
-         end
 
       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -452,33 +410,34 @@ if plot_flag
   set(gcf,'position',[10,10,400,300])
 
 
-
+%SIGNAL CHARACTERIZATION PLOTS
   figure(4)
-  plot(1:num_used_subcarriers, abs(squeeze(plot_signal_jammerless(1,:,1))), 'LineWidth', 2)
+  plot(1:num_used_subcarriers, abs(squeeze(plot_signal_jammerless(1,:,1))), 'LineWidth', 2, 'Color', 'blue')
   xlabel('Used Subcarrier Index','FontSize',12)
   ylabel('Signal Magnitude','FontSize',12)
-  title('Jammerless Signal After Removing Unused Subcarriers','FontSize',12)
+  title('Jammerless Signal After Subcarriers Assignment','FontSize',12)
   grid on
   set(gca,'FontSize',12)
   set(gcf,'position',[10,10,400,300])
 
-    figure(5)
-  plot(1:num_used_subcarriers, abs(squeeze(plot_signal_jammerless(1,:,1))), 'LineWidth', 2)
+  figure(5)
+  plot(1:num_used_subcarriers, abs(squeeze(plot_signal_compliant(1,:,1))), 'LineWidth', 2, 'Color', 'red')
   xlabel('Used Subcarrier Index','FontSize',12)
   ylabel('Signal Magnitude','FontSize',12)
-  title('Jammerless Signal After Removing Unused Subcarriers','FontSize',12)
+  title('Jammer Compliant Signal After Subcarriers Assignment','FontSize',12)
   grid on
   set(gca,'FontSize',12)
   set(gcf,'position',[10,10,400,300])
 
-      figure(6)
-  plot(1:num_used_subcarriers, abs(squeeze(plot_signal_jammerless(1,:,1))), 'LineWidth', 2)
+  figure(6)
+  plot(1:num_used_subcarriers, abs(squeeze(plot_signal_noncompliant(1,:,1))), 'LineWidth', 2, 'Color', 'yellow')
   xlabel('Used Subcarrier Index','FontSize',12)
   ylabel('Signal Magnitude','FontSize',12)
-  title('Jammerless Signal After Removing Unused Subcarriers','FontSize',12)
+  title('Jammer NonCompliant Signal After Subcarriers Assignment','FontSize',12)
   grid on
   set(gca,'FontSize',12)
   set(gcf,'position',[10,10,400,300])
+
   % Plot jammer statistics
   figure(5)
   % Average magnitude over trials and OFDM symbols for compliant jammer
