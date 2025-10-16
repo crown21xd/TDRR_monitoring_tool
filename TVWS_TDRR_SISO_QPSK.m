@@ -16,8 +16,8 @@ jammer_power_dB = 30;                        % par.rho_dB: jammer strength relat
 modulation_scheme = 'QPSK';                  % par.mod: transmit constellation (modulation scheme: QPSK for 2 bits/symbol)
 random_jammer_power_flag = 0;                % par.random_jammer_power: if true, jammer power varies randomly per trial; else fixed at par.rho_dB
     
-num_trials = 2;                            % par.trials: number of Monte-Carlo trials (different channel realizations for statistical averaging)
-snr_dB_list = -5:1:25;                       % par.SNRdB_list: list of SNR values (in dB) to simulate (signal-to-noise ratio sweep)
+num_trials = 100;                            % par.trials: number of Monte-Carlo trials (different channel realizations for statistical averaging)
+snr_dB_list = -5:1:50;                       % par.SNRdB_list: list of SNR values (in dB) to simulate (signal-to-noise ratio sweep)
 
 plot_flag = 1;                              % par.plot: flag to enable/disable plotting of simulation results
 print_messages_flag = 1;                     % par.printmsg: flag to enable/disable printing of progress messages during simulation
@@ -364,7 +364,7 @@ for trial_index=1:num_trials
             subplot(5,1,1)
             plot(used_subcarrier_indices, real(squeeze(y_jammerless_frequency_tones(antenna_idx,:,ofdm_symbol_idx))))
             ylim([-100 100])
-            title('Legitimate TVWS ')
+            title('Legitimate TVWS Frequency Tones')
             xlabel('Subcarrier Index')
             ylabel('Magnitude')
 
@@ -416,7 +416,7 @@ avg_y_jammer_noncompliant = avg_y_jammer_noncompliant / num_trials;
 %%% plot results
 % Corresponds to Section V (Results): Visualization of BER performance and interference distribution.
 if plot_flag
-
+   
   figure(1)
   semilogy(snr_dB_list, results.BER_jammerless, 'LineWidth', 2.5)
   hold off
@@ -470,84 +470,143 @@ if plot_flag
   set(gcf,'position',[10,10,400,300])
 
   figure(5)
-  semilogy(snr_dB_list, results.BER_projections(1,:), 'LineWidth', 2.5)
-  hold on
-  for b=2:num_channel_taps
-    semilogy(snr_dB_list, results.BER_projections(b,:), 'LineWidth', 2.5)
+    clf
+    
+    % Plot jammerless baseline
+    semilogy(snr_dB_list, results.BER_jammerless, 'k--', 'LineWidth', 2.5)
+    hold on
+    
+    % Plot projected cases (CP-violating jammer with nulling)
+    colors = lines(num_channel_taps); % MATLAB color map for consistency
+    for b = 1:num_channel_taps
+    semilogy(snr_dB_list, results.BER_projections(b,:), 'LineWidth', 2.5, 'Color', colors(b,:))
+    end
+    
+    grid on
+    axis([min(snr_dB_list) max(snr_dB_list) 1e-4 1])
+    xlabel('Average SNR per receive antenna [dB]', 'FontSize', 12)
+    ylabel('Uncoded Bit Error Rate (BER)', 'FontSize', 12)
+    
+    % ----- Legend setup -----
+    numbers = cell(1, num_channel_taps + 1);
+    numbers{1} = "Legitimate TVWS (Jammerless)";
+    for b = 1:num_channel_taps
+    numbers{b+1} = "CP-violating Jammer: Null " + num2str(b) + " Dimension(s)";
+    end
+    legend(numbers, 'FontSize', 11, 'Interpreter', 'none', 'Location', 'southwest')
+    
+    set(gca, 'FontSize', 12)
+    set(gcf, 'Position', [10, 10, 600, 400])
+    title('BER vs. SNR for Legitimate and Projected CP-violating Jammer Cases')
+
+    % Plot jammer statistics
+    figure(6)
+    % Average magnitude over trials and OFDM symbols for compliant jammer
+    jammer_compliant_avg = mean(mean(abs(jammer_compliant_freq_domain),4),1); % Average over trials and OFDM symbols
+    subplot(2,1,1)
+    imagesc(squeeze(jammer_compliant_avg))
+    title('Jammer Compliant Frequency Domain Magnitude (Avg over Trials and OFDM Symbols)')
+    xlabel('Receive Antenna')
+    ylabel('Subcarrier Index')
+    colorbar
+    jammer_noncompliant_avg = mean(mean(abs(jammer_noncompliant_freq_domain),4),1); % Average over trials and OFDM symbols
+    subplot(2,1,2)
+    imagesc(squeeze(jammer_noncompliant_avg))
+    title('Jammer Noncompliant Frequency Domain Magnitude (Avg over Trials and OFDM Symbols)')
+    xlabel('Receive Antenna')
+    ylabel('Subcarrier Index')
+    colorbar
+    set(gcf,'position',[10,10,600,400])
+    
+    % Plot frequency domain average signals for last OFDM symbol
+    antenna_idx = 1;
+    ofdm_symbol_idx = num_ofdm_symbols; % last OFDM symbol
+    figure(7)
+    subplot(3,1,1)
+    plot(used_subcarrier_indices, real(squeeze(avg_y_jammerless(antenna_idx,:,ofdm_symbol_idx))))
+    ylim([-100 100])
+    title('Average Legitimate TVWS')
+    xlabel('Subcarrier Index')
+    ylabel('Magnitude')
+    subplot(3,1,2)
+    plot(used_subcarrier_indices, real(squeeze(avg_y_jammer_compliant(antenna_idx,:,ofdm_symbol_idx))))
+    ylim([-100 100])
+    title('Average OFDM-compliant Illegitimate TVWS Frequency Tones')
+    xlabel('Subcarrier Index')
+    ylabel('Magnitude')
+    subplot(3,1,3)
+    plot(used_subcarrier_indices, real(squeeze(avg_y_jammer_noncompliant(antenna_idx,:,ofdm_symbol_idx))))
+    ylim([-100 100])
+    title('Average Cyclic prefix-violating Illegitimate TVWS Frequency Tones')
+    xlabel('Subcarrier Index')
+    ylabel('Magnitude')
+    % Super title for the figure
+    sgtitle(['Average Received Signals at Used Subcarriers (OFDM Symbol ', num2str(ofdm_symbol_idx), ') Across ', num2str(num_trials), ' Trials'])
+    
+    % Figure 1: Average Legitimate TVWS
+    figure(8)
+    clf
+    plot(used_subcarrier_indices, real(squeeze(avg_y_jammerless(antenna_idx,:,ofdm_symbol_idx))))
+    ylim([-100 100])
+    %title('Average Legitimate TVWS')
+    xlabel('Subcarrier Index')
+    ylabel('Magnitude')
+    sgtitle(['Average Received Signals (Legitimate TVWS) at Used Subcarriers (OFDM Symbol ', num2str(ofdm_symbol_idx), ') Across ', num2str(num_trials), ' Trials'])
+    
+    % Figure 2: Average OFDM-compliant Illegitimate TVWS
+    figure(9)
+    clf
+    plot(used_subcarrier_indices, real(squeeze(avg_y_jammer_compliant(antenna_idx,:,ofdm_symbol_idx))))
+    ylim([-100 100])
+    %title('Average OFDM-compliant Illegitimate TVWS Frequency Tones')
+    xlabel('Subcarrier Index')
+    ylabel('Magnitude')
+    sgtitle(['Average Received Signals (OFDM-compliant Illegitimate TVWS)at Used Subcarriers (OFDM Symbol ', num2str(ofdm_symbol_idx), ') Across ', num2str(num_trials), ' Trials'])
+    
+    % Figure 3: Average Cyclic prefix-violating Illegitimate TVWS
+    figure(10)
+    clf
+    plot(used_subcarrier_indices, real(squeeze(avg_y_jammer_noncompliant(antenna_idx,:,ofdm_symbol_idx))))
+    ylim([-100 100])
+    %title('Average Cyclic prefix-violating Illegitimate TVWS Frequency Tones')
+    xlabel('Subcarrier Index')
+    ylabel('Magnitude')
+    sgtitle(['Average Received Signal (Cyclic prefix-violating Illegitimate TVWS) at Used Subcarriers (OFDM Symbol ', num2str(ofdm_symbol_idx), ') Across ', num2str(num_trials), ' Trials'])
+
+
+current_dir = pwd;
+figures_dir = fullfile(current_dir, 'figures'); 
+  
+  % Create folder if it doesn't exist
+  if ~exist(figures_dir, 'dir')
+      mkdir(figures_dir);
   end
-  hold off
-  grid on
-  axis([min(snr_dB_list) max(snr_dB_list) 1e-4 1])
-  xlabel('average SNR per receive antenna [dB]','FontSize',12)
-  ylabel('uncoded bit error-rate (BER)','FontSize',12)
-  numbers = {};
-  for b = 1:num_channel_taps
-    numbers{b} = "Cyclic Prefix-Violating Jammer: Null " + num2str(b) + " Dimensions";
+
+  % Find all figure handles
+  figHandles = findall(0, 'Type', 'figure');
+
+   for i = 1:length(figHandles)
+      figNum = figHandles(i).Number;
+      filename = fullfile(figures_dir, sprintf('%d.png', figNum));
+      fprintf('Saving Figure %d → %s\n', figNum, filename);
+
+      % --- Add margin & save high quality ---
+      % Set figure background to white
+      set(figHandles(i), 'Color', 'white');
+
+      % Adjust paper size slightly larger than figure
+      set(figHandles(i), 'PaperPositionMode', 'auto');
+      pos = get(figHandles(i), 'Position');
+      margin = 50; % pixels of margin
+      set(figHandles(i), 'Position', [pos(1)-margin pos(2)-margin pos(3)+2*margin pos(4)+2*margin]);
+
+      % Save as high-resolution PNG
+      print(figHandles(i), filename, '-dpng', '-r300');
   end
-  legend(numbers,'FontSize',12,'Interpreter','none')
-  set(gca,'FontSize',12)
-  set(gcf,'position',[10,10,400,300])
 
-  % Plot jammer statistics
-  figure(6)
-  % Average magnitude over trials and OFDM symbols for compliant jammer
-  jammer_compliant_avg = mean(mean(abs(jammer_compliant_freq_domain),4),1); % Average over trials and OFDM symbols
-  subplot(2,1,1)
-  imagesc(squeeze(jammer_compliant_avg))
-  title('Jammer Compliant Frequency Domain Magnitude (Avg over Trials and OFDM Symbols)')
-  xlabel('Receive Antenna')
-  ylabel('Subcarrier Index')
-  colorbar
+  fprintf('All figures saved in folder "%s".\n', figures_dir);
+  % 
+  % pause(2)  % pause 2 seconds to view the plot
+  % close all
 
-  % Average magnitude over trials and OFDM symbols for noncompliant jammer
-  jammer_noncompliant_avg = mean(mean(abs(jammer_noncompliant_freq_domain),4),1); % Average over trials and OFDM symbols
-  subplot(2,1,2)
-  imagesc(squeeze(jammer_noncompliant_avg))
-  title('Jammer Noncompliant Frequency Domain Magnitude (Avg over Trials and OFDM Symbols)')
-  xlabel('Receive Antenna')
-  ylabel('Subcarrier Index')
-  colorbar
-  set(gcf,'position',[10,10,600,400])
-
- % After all trials are done
-figure(11)
-clf
-antenna_idx = 1;
-ofdm_symbol_idx = num_ofdm_symbols; % last OFDM symbol
-
-% Extract the real magnitudes
-legit_signal = real(squeeze(avg_y_jammerless(antenna_idx,:,ofdm_symbol_idx)));
-compliant_signal = real(squeeze(avg_y_jammer_compliant(antenna_idx,:,ofdm_symbol_idx)));
-noncompliant_signal = real(squeeze(avg_y_jammer_noncompliant(antenna_idx,:,ofdm_symbol_idx)));
-
-% Compute shared Y limits (flexible, based on max magnitude across all)
-max_val = max([abs(legit_signal(:)); abs(compliant_signal(:)); abs(noncompliant_signal(:))]);
-yl = [-100 100];
-
-% Plot 1 – Legitimate TVWS
-figure;
-plot(used_subcarrier_indices, legit_signal, 'b', 'LineWidth', 1.3);
-ylim(yl);
-grid on;
-title(['Average Legitimate TVWS (', num2str(num_trials), ' Trials)']);
-xlabel('Subcarrier Index');
-ylabel('Magnitude');
-
-% Plot 2 – OFDM-compliant Illegitimate TVWS
-figure;
-plot(used_subcarrier_indices, compliant_signal, 'r', 'LineWidth', 1.3);
-ylim(yl);
-grid on;
-title(['Average OFDM-compliant Illegitimate TVWS (', num2str(num_trials), ' Trials)']);
-xlabel('Subcarrier Index');
-ylabel('Magnitude');
-
-% Plot 3 – CP-violating Illegitimate TVWS
-figure;
-plot(used_subcarrier_indices, noncompliant_signal, 'm', 'LineWidth', 1.3);
-ylim(yl);
-grid on;
-title(['Average CP-violating Illegitimate TVWS (', num2str(num_trials), ' Trials)']);
-xlabel('Subcarrier Index');
-ylabel('Magnitude');
 end
