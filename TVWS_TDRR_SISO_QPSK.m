@@ -364,21 +364,21 @@ for trial_index=1:num_trials
             subplot(5,1,1)
             plot(used_subcarrier_indices, real(squeeze(y_jammerless_frequency_tones(antenna_idx,:,ofdm_symbol_idx))))
             ylim([-100 100])
-            title('Legitimate TVWS Frequency Tones')
+            title('Legitimate TVWSO Frequency Tones')
             xlabel('Subcarrier Index')
             ylabel('Magnitude')
 
             subplot(5,1,2)
             plot(used_subcarrier_indices, real(squeeze(y_jammer_compliant_frequency_tones(antenna_idx,:,ofdm_symbol_idx))))
             ylim([-100 100])
-            title('OFDM-compliant Illegitimate TVWS Frequency Tones ')
+            title('OFDM-compliant Illegal TVWSO Frequency Tones ')
             xlabel('Subcarrier Index')
             ylabel('Magnitude')
 
             subplot(5,1,3)
             plot(used_subcarrier_indices, real(squeeze(y_jammer_noncompliant_frequency_tones(antenna_idx,:,ofdm_symbol_idx))))
             ylim([-100 100])
-            title('Cyclic prefix-violating Illegitimate TVWS Frequency Tones ')
+            title('Cyclic prefix-violating Illegal TVWSO Frequency Tones ')
             xlabel('Subcarrier Index')
             ylabel('Magnitude')
 
@@ -489,7 +489,7 @@ if plot_flag
     
     % ----- Legend setup -----
     numbers = cell(1, num_channel_taps + 1);
-    numbers{1} = "Legitimate TVWS (Jammerless)";
+    numbers{1} = "Legitimate TVWSO (Jammerless)";
     for b = 1:num_channel_taps
     numbers{b+1} = "CP-violating Jammer: Null " + num2str(b) + " Dimension(s)";
     end
@@ -525,19 +525,19 @@ if plot_flag
     subplot(3,1,1)
     plot(used_subcarrier_indices, real(squeeze(avg_y_jammerless(antenna_idx,:,ofdm_symbol_idx))))
     ylim([-100 100])
-    title('Average Legitimate TVWS')
+    title('Average Legitimate TVWSO')
     xlabel('Subcarrier Index')
     ylabel('Magnitude')
     subplot(3,1,2)
     plot(used_subcarrier_indices, real(squeeze(avg_y_jammer_compliant(antenna_idx,:,ofdm_symbol_idx))))
     ylim([-100 100])
-    title('Average OFDM-compliant Illegitimate TVWS Frequency Tones')
+    title('Average OFDM-compliant Illegal TVWSO Frequency Tones')
     xlabel('Subcarrier Index')
     ylabel('Magnitude')
     subplot(3,1,3)
     plot(used_subcarrier_indices, real(squeeze(avg_y_jammer_noncompliant(antenna_idx,:,ofdm_symbol_idx))))
     ylim([-100 100])
-    title('Average Cyclic prefix-violating Illegitimate TVWS Frequency Tones')
+    title('Average Cyclic prefix-violating Illegal TVWSO Frequency Tones')
     xlabel('Subcarrier Index')
     ylabel('Magnitude')
     % Super title for the figure
@@ -551,7 +551,7 @@ if plot_flag
     %title('Average Legitimate TVWS')
     xlabel('Subcarrier Index')
     ylabel('Magnitude')
-    sgtitle(['Average Received Signals (Legitimate TVWS) at Used Subcarriers (OFDM Symbol ', num2str(ofdm_symbol_idx), ') Across ', num2str(num_trials), ' Trials'])
+    sgtitle(['Average Received Signals (Legitimate TVWSO) at Used Subcarriers (OFDM Symbol ', num2str(ofdm_symbol_idx), ') Across ', num2str(num_trials), ' Trials'])
     
     % Figure 2: Average OFDM-compliant Illegitimate TVWS
     figure(9)
@@ -561,7 +561,7 @@ if plot_flag
     %title('Average OFDM-compliant Illegitimate TVWS Frequency Tones')
     xlabel('Subcarrier Index')
     ylabel('Magnitude')
-    sgtitle(['Average Received Signals (OFDM-compliant Illegitimate TVWS)at Used Subcarriers (OFDM Symbol ', num2str(ofdm_symbol_idx), ') Across ', num2str(num_trials), ' Trials'])
+    sgtitle(['Average Received Signals (OFDM-compliant Illegal TVWSO)at Used Subcarriers (OFDM Symbol ', num2str(ofdm_symbol_idx), ') Across ', num2str(num_trials), ' Trials'])
     
     % Figure 3: Average Cyclic prefix-violating Illegitimate TVWS
     figure(10)
@@ -571,7 +571,7 @@ if plot_flag
     %title('Average Cyclic prefix-violating Illegitimate TVWS Frequency Tones')
     xlabel('Subcarrier Index')
     ylabel('Magnitude')
-    sgtitle(['Average Received Signal (Cyclic prefix-violating Illegitimate TVWS) at Used Subcarriers (OFDM Symbol ', num2str(ofdm_symbol_idx), ') Across ', num2str(num_trials), ' Trials'])
+    sgtitle(['Average Received Signal (Cyclic prefix-violating Illegal TVWSO) at Used Subcarriers (OFDM Symbol ', num2str(ofdm_symbol_idx), ') Across ', num2str(num_trials), ' Trials'])
 
 
 current_dir = pwd;
