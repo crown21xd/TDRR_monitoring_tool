@@ -424,7 +424,7 @@ if plot_flag
   axis([min(snr_dB_list) max(snr_dB_list) 1e-4 1])
   xlabel('average SNR per receive antenna [dB]','FontSize',12)
   ylabel('uncoded bit error-rate (BER)','FontSize',12)
-  legend("Legitimate TVWS",'FontSize',12,'Interpreter','none')
+  legend("Legitimate TVWSO",'FontSize',12,'Interpreter','none')
   set(gca,'FontSize',12)
   set(gcf,'position',[10,10,400,300])
 
@@ -437,7 +437,7 @@ if plot_flag
   axis([min(snr_dB_list) max(snr_dB_list) 1e-4 1])
   xlabel('average SNR per receive antenna [dB]','FontSize',12)
   ylabel('uncoded bit error-rate (BER)','FontSize',12)
-  legend(["Legitimate TVWS", "OFDM-compliant Illegitimate TVWS"],'FontSize',12,'Interpreter','none')
+  legend(["Legitimate TVWSO", "OFDM-compliant Illegitimate TVWSO"],'FontSize',12,'Interpreter','none')
   set(gca,'FontSize',12)
   set(gcf,'position',[10,10,400,300])
 
@@ -450,7 +450,7 @@ if plot_flag
   axis([min(snr_dB_list) max(snr_dB_list) 1e-4 1])
   xlabel('average SNR per receive antenna [dB]','FontSize',12)
   ylabel('uncoded bit error-rate (BER)','FontSize',12)
-  legend(["Legitimate TVWS", "Cyclic prefix-violating Illegitimate TVWS"],'FontSize',12,'Interpreter','none')
+  legend(["Legitimate TVWS", "Cyclic prefix-violating Illegal TVWSO"],'FontSize',12,'Interpreter','none')
   set(gca,'FontSize',12)
   set(gcf,'position',[10,10,400,300])
 
