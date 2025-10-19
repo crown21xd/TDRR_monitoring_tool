@@ -6,7 +6,7 @@
 % including antenna counts, channel taps, modulation, and simulation settings for evaluating jammer impact.
 num_receive_antennas = 1;                    % 8 par.B:BTS  number of receive antennas
 num_transmit_antennas = 1;                    % 2 par.U:OPERATOR number of transmit antennas and data streams
-num_channel_taps = 1;                        % 4 par.L: number of channel taps (multipath delay spread)
+num_channel_taps = 2;                        % 4 par.L: number of channel taps (multipath delay spread)
 cyclic_prefix_length = 16;                   % par.P: cyclic prefix length (to combat inter-symbol interference)
 num_subcarriers = 64;                        % par.N_sc: number of total subcarriers (FFT size for OFDM)
 used_subcarrier_indices = [-26:-22, -20:-8, -6:-1, 1:6, 8:20, 22:26] + 32; % par.tonelist: list of used subcarriers (data-bearing tones), shifted by 32 for DC centering
@@ -17,7 +17,7 @@ modulation_scheme = 'QPSK';                  % par.mod: transmit constellation (
 random_jammer_power_flag = 0;                % par.random_jammer_power: if true, jammer power varies randomly per trial; else fixed at par.rho_dB
     
 num_trials = 100;                            % par.trials: number of Monte-Carlo trials (different channel realizations for statistical averaging)
-snr_dB_list = -5:1:50;                       % par.SNRdB_list: list of SNR values (in dB) to simulate (signal-to-noise ratio sweep)
+snr_dB_list = -5:1:20;                       % par.SNRdB_list: list of SNR values (in dB) to simulate (signal-to-noise ratio sweep)
 
 plot_flag = 1;                              % par.plot: flag to enable/disable plotting of simulation results
 print_messages_flag = 1;                     % par.printmsg: flag to enable/disable printing of progress messages during simulation
@@ -290,50 +290,47 @@ for trial_index=1:num_trials
       % Corresponds to Section IV (Mitigation): Decoding.
       symbols_estimate_jammerless_vector = reshape(symbols_estimate_jammerless, [num_ofdm_symbols*num_transmit_antennas,1]);  % vectorize estimated symbols
       [~,indices_hat_vector] = min(abs(symbols_estimate_jammerless_vector*ones(1,length(constellation_symbols))-ones(num_ofdm_symbols*num_transmit_antennas,1)*constellation_symbols).^2,[],2);  % find closest constellation points
-      indices_hat_jammerless = reshape(indices_hat_vector, [num_transmit_antennas, num_ofdm_symbols]);  % reshape indices
-      bits_hat_jammerless = bit_mappings(indices_hat_jammerless,:);  % map indices to bits
+      indices_hat_jammerless = indices_hat_vector;  % indices [50,1]
+      bits_hat_jammerless = bit_mappings(indices_hat_jammerless,:);  % map indices to bits [50,2]
 
       symbols_estimate_compliant_vector = reshape(symbols_estimate_compliant, [num_ofdm_symbols*num_transmit_antennas,1]);
       [~,indices_hat_vector] = min(abs(symbols_estimate_compliant_vector*ones(1,length(constellation_symbols))-ones(num_ofdm_symbols*num_transmit_antennas,1)*constellation_symbols).^2,[],2);
-      indices_hat_compliant = reshape(indices_hat_vector, [num_transmit_antennas, num_ofdm_symbols]);
-      bits_hat_compliant = bit_mappings(indices_hat_compliant,:);
+      indices_hat_compliant = indices_hat_vector;
+      bits_hat_compliant = bit_mappings(indices_hat_compliant,:);  % [50,2]
 
       symbols_estimate_noncompliant_vector = reshape(symbols_estimate_noncompliant, [num_ofdm_symbols*num_transmit_antennas,1]);
       [~,indices_hat_vector] = min(abs(symbols_estimate_noncompliant_vector*ones(1,length(constellation_symbols))-ones(num_ofdm_symbols*num_transmit_antennas,1)*constellation_symbols).^2,[],2);
-      indices_hat_noncompliant = reshape(indices_hat_vector, [num_transmit_antennas, num_ofdm_symbols]);
-      bits_hat_noncompliant = bit_mappings(indices_hat_noncompliant,:);
+      indices_hat_noncompliant = indices_hat_vector;
+      bits_hat_noncompliant = bit_mappings(indices_hat_noncompliant,:);  % [50,2]
 
-      bits_hat_projections = zeros(num_channel_taps,num_transmit_antennas*num_ofdm_symbols,bits_per_symbol);
+      bits_hat_projections = zeros(num_channel_taps, num_ofdm_symbols, num_transmit_antennas, bits_per_symbol);
       for b=1:num_channel_taps
         symbols_estimate_vector = reshape(symbols_estimate_projections(b,:,:), [num_ofdm_symbols*num_transmit_antennas,1]);
         [~,indices_hat_vector] = min(abs(symbols_estimate_vector*ones(1,length(constellation_symbols))-ones(num_ofdm_symbols*num_transmit_antennas,1)*constellation_symbols).^2,[],2);
-        indices_hat = reshape(indices_hat_vector, [num_transmit_antennas, num_ofdm_symbols]);
-        bits_hat_projections(b,:,:) = bit_mappings(indices_hat,:);
+        indices_hat = reshape(indices_hat_vector, [num_ofdm_symbols, num_transmit_antennas]);
+        bits_hat_projections(b,:,:,:) = reshape(bit_mappings(indices_hat,:), [num_ofdm_symbols, num_transmit_antennas, bits_per_symbol]);
       end
       
 
       %gian marti BER
       % -- compute error metrics by comparing estimated bits to true bits
       % Corresponds to Section IV (Mitigation): BER calculation.
-      bit_tensor = squeeze(bits(trial_index,:,:,:,tone_index));  % extract bits for current trial and subcarrier
-      bit_tensor = permute(bit_tensor,[3 2 1]);  % reorder dimensions for comparison
-      true_bits = bit_tensor(:,:)';  % flatten to 2D matrix
-      bits_hat_jammerless = permute(bits_hat_jammerless, [3 2 1]);
-        bits_hat_jammerless = bits_hat_jammerless(:,:)';
-        
-        bits_hat_compliant = permute(bits_hat_compliant, [3 2 1]);
-        bits_hat_compliant = bits_hat_compliant(:,:)';
-        
-        bits_hat_noncompliant = permute(bits_hat_noncompliant, [3 2 1]);
-        bits_hat_noncompliant = bits_hat_noncompliant(:,:)';
+      bit_tensor = squeeze(bits(trial_index,:,:,:,tone_index));  % extract bits for current trial and subcarrier [50,2]
+      bit_tensor = permute(bit_tensor,[2 1]);  % reorder dimensions for comparison [2,50]
+      true_bits = bit_tensor(:,:)';  % flatten to 2D matrix [50,2]
+      % bits_hat_jammerless is already 50x2 after reshape and transpose
+      % bits_hat_compliant is already 50x2 after reshape and transpose
+      % bits_hat_noncompliant is already 50x2 after reshape and transpose
 
       results.BER_jammerless(snr_index) = results.BER_jammerless(snr_index) + sum(sum(true_bits~=bits_hat_jammerless));  % count bit errors jammerless
       results.BER_compliant(snr_index) = results.BER_compliant(snr_index) + sum(sum(true_bits~=bits_hat_compliant));  % count bit errors jammer compliant
       results.BER_noncompliant(snr_index) = results.BER_noncompliant(snr_index) + sum(sum(true_bits~=bits_hat_noncompliant));  % count bit errors jammer noncompliant
       for b=1:num_channel_taps
-          bits_hat_proj = permute(squeeze(bits_hat_projections(b,:,:,:)), [3 2 1]);
-          bits_hat_projections = bits_hat_proj(:,:)';
-        results.BER_projections(b,snr_index) = results.BER_projections(b,snr_index) + sum(sum(true_bits~=squeeze(bits_hat_projections(b,:,:))));  % count bit errors for each nulling dimension
+        bits_hat_proj = squeeze(bits_hat_projections(b,:,:));
+        bits_hat_proj = reshape(bits_hat_proj, [num_transmit_antennas, num_ofdm_symbols, bits_per_symbol]);
+        bits_hat_proj = permute(bits_hat_proj, [3 2 1]);
+        bits_hat_proj = bits_hat_proj(:,:)';
+        results.BER_projections(b,snr_index) = results.BER_projections(b,snr_index) + sum(sum(true_bits~=bits_hat_proj));  % count bit errors for each nulling dimension
       end
 
     end
